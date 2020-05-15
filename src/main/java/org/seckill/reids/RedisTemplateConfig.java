@@ -43,7 +43,7 @@ public class RedisTemplateConfig<T> {
         // value的序列化采用jackson
         redisTemplate.setValueSerializer(jacksonSerializer);
         // hash的key也采用String的序列化
-        redisTemplate.setHashKeySerializer(jacksonSerializer);
+        redisTemplate.setHashKeySerializer(redisSerializer);
         // hash的value也采用jackson
         redisTemplate.setValueSerializer(jacksonSerializer);
         logger.info("RedisTemplate序列化配置，转化方式：" + jacksonSerializer.getClass().getName());

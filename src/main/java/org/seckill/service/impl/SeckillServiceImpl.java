@@ -3,6 +3,8 @@ package org.seckill.service.impl;
 import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 import org.seckill.dao.SeckillDao;
 import org.seckill.dao.cache.RedisDao;
@@ -37,6 +39,8 @@ public class SeckillServiceImpl implements SeckillService {
     // 设置盐 进行加密
     private final String salt = "fweqr43543&*&*hjfdh";
 
+    // 库存卖完标记
+    private static ConcurrentMap<String, Boolean> productSoldOutMap = new ConcurrentHashMap<>();
 
     @Autowired
     private SeckillDao seckillDao;
@@ -112,6 +116,12 @@ public class SeckillServiceImpl implements SeckillService {
         if (md5 == null || !md5.equals(getMD5(seckillId))) {
             throw new SeckillException("seckill data rewrite");
         }
+
+        if (productSoldOutMap.get(seckillId + md5) != null) {
+            // 库存不足
+            throw new SeckillCloseException("Spike failed");
+        }
+
         //执行秒杀逻辑：1.减库存；2.储存秒杀订单
         Date nowTime = new Date();
 
@@ -119,9 +129,19 @@ public class SeckillServiceImpl implements SeckillService {
             // redis记录是否可以秒杀 防止超卖
             Long luaSeckill = redisDao.getLUASeckill(seckillId);
             if (luaSeckill < 0) {
+                // 库存卖完 设置为true
+                productSoldOutMap.put(seckillId + md5, true);
                 // 库存不足
                 throw new SeckillCloseException("Spike failed");
             }
+        } catch (SeckillCloseException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error(e.getMessage(), e);
+            //所有编译期异常，转换为运行期异常
+            throw new SeckillException("seckill inner error:" + e.getMessage());
+        }
+        try {
             //记录秒杀订单信息
             int insertCount = seckillOrderDao.insertSuccessKilled(seckillId, money, userPhone);
             //唯一性：seckillId,userPhone，保证一个用户只能秒杀一件商品
@@ -136,6 +156,10 @@ public class SeckillServiceImpl implements SeckillService {
                 if (updateCount <= 0) {
                     // redis下单数减一
                     redisDao.putLUASeckill(seckillId);
+                    // redis顶点减少  清除卖完标记
+                    if (productSoldOutMap.get(seckillId + md5) != null) {
+                        productSoldOutMap.remove(seckillId + md5);
+                    }
                     //没有更新记录，秒杀结束
                     throw new SeckillCloseException("seckill is closed");
                 } else {

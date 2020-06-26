@@ -28,17 +28,17 @@ public class RedisDao {
     // 下单总数
     private final String place = "orderPlace";
 
-    /** 使用lua脚本判断 如果下单数量orderCount + 1 小于 商品总数orders  然后下单数加1 **/
-    private static final String GET_LUA_SCRIPT = "local orderCount = tonumber(redis.call('get', KEYS[1]) or 0)  " +
-            "local orderCounts = orderCount + 1 " +
-            "local orders = tonumber(redis.call('get', KEYS[2]) or 0) " +
-            "if  orderCounts > orders then " +
+    /** 使用lua脚本判断 如果下单数量orderPlace + 1 小于 商品总数orderCount  然后下单数加1 **/
+    private static final String GET_LUA_SCRIPT = "local orderPlace = tonumber(redis.call('get', KEYS[1]) or 0)  " +
+            "local orderPlaces = orderPlace + 1 " +
+            "local orderCount = tonumber(redis.call('get', KEYS[2]) or 0) " +
+            "if  orderPlaces > orderCount then " +
             "return -1 " +
             "else " +
-            "redis.call('set', KEYS[1], orderCounts)" +
+            "redis.call('set', KEYS[1], orderPlaces)" +
             "return 3 end";
 
-    private static final String PUT_LUA_SCRIPT = "local orderCount = tonumber(redis.call('get', KEYS[1]) or 0) redis.call('set', KEYS[1], orderCount-1) return 3";
+    private static final String PUT_LUA_SCRIPT = "local orderPlace = tonumber(redis.call('get', KEYS[1]) or 0) redis.call('set', KEYS[1], orderPlace-1) return 3";
 
 
     public String setSeckillBySeckillId(Long seckillId, long stockCount) {
@@ -48,7 +48,7 @@ public class RedisDao {
     }
 
     public Integer getSeckillBySeckillId(Long seckillId) {
-        return  (Integer)redisTemplate.opsForValue().get(key + seckillId + place);
+        return  (Integer)redisTemplate.opsForValue().get(key + seckillId + order);
     }
 
     /**
